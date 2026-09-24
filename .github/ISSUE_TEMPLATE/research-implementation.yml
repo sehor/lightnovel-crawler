@@ -1,0 +1,60 @@
+name: Research 阶段子任务
+description: 起点开篇研究采集器的单项、可验收开发任务
+title: "[Research] "
+body:
+  - type: input
+    id: task_id
+    attributes:
+      label: 任务编号与阶段
+      description: 对应 docs/plan/issues.md 的 ID 与阶段文档任务号
+      placeholder: "例如 02.1 / docs/plan/02-ranking.md#具体任务"
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: 本次唯一交付物
+      description: 写清完成后可以检查到什么
+      placeholder: "例如解析单页榜单并输出带原始名次的 BookCandidate"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 必读文档与前置 Issue
+      description: 链接产品说明书、contracts.md、当前阶段文档及依赖 Issue
+      placeholder: "列出仓库相对路径和 Issue 编号"
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: 允许修改的范围
+      description: 指明模块或文件；额外改动先更新此 Issue
+      placeholder: "例如 research/rankings/ 与 tests/research/"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 实施步骤
+      description: 对应阶段文档中的一个任务，不把后续阶段合并进来
+      placeholder: "按可执行顺序列出关键步骤"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收命令与可观察结果
+      description: 包括离线测试；真实访问仅在阶段 0 允许的条件下执行
+      placeholder: "命令、预期结果和人工核对点"
+    validations:
+      required: true
+  - type: textarea
+    id: handoff
+    attributes:
+      label: 交接记录
+      description: PR 中或任务完成时填写修改文件、实际命令与结果、未解决问题
+      placeholder: "完成后补充"
+    validations:
+      required: false

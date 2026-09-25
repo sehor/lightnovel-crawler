@@ -1,5 +1,5 @@
 {
-  "v": 1785764141,
+  "v": 1790320308,
   "app": {
     "windows": "https://go.bitanon.dev/lncrawl-windows",
     "linux": "https://go.bitanon.dev/lncrawl-linux",
@@ -257,6 +257,7 @@
     "https://battwo.com/": "5955ede148817d13e8ef04255da4237d",
     "https://bednovel.com/": "8fa5bb4014a0aaab31786ac2dbbc333c",
     "https://blnovels.net/": "2b62a91a8d4d9497364bfecf4530c2a1",
+    "https://book.qidian.com/": "c812b1f6e807da9a7d4c481e4c0ac68c",
     "https://bookhamster.ru/": "56cf47825b16189855ee706f2762d59a",
     "https://booknet.com/": "c6b2d34f33d246ecbbf40115ffe8725c",
     "https://cangji.net/": "46b2be63c3cc33cfb57ae4af767b6734",
@@ -548,6 +549,7 @@
     "https://www.piaotian.com/": "e2a0a1f66eec221866f52e14af342c50",
     "https://www.powanjuan.cc/": "70e5c69ad6a634604d43e2cd29e36d65",
     "https://www.ptwxz.com/": "e2a0a1f66eec221866f52e14af342c50",
+    "https://www.qidian.com/": "c812b1f6e807da9a7d4c481e4c0ac68c",
     "https://www.quotev.com/": "5d2837e1dfeaeb287163d4b4de9f752e",
     "https://www.readlightnovel.cc/": "96b9a9c6b35c6960eb5c06ff20918555",
     "https://www.readlightnovel.me/": "13731ad27f3abb8a72932375df633b1f",
@@ -8263,6 +8265,25 @@
         "https://my.w.tt/"
       ],
       "github_url": "https://github.com/lncrawl/lightnovel-crawler/blob/dev/sources/multi/wattpad.py"
+    },
+    "c812b1f6e807da9a7d4c481e4c0ac68c": {
+      "version": 1790253615,
+      "md5": "33e7f5f57f912a2135fec55225291cc8",
+      "file_path": "sources/zh/qidian.py",
+      "language": "zh",
+      "has_manga": false,
+      "can_login": false,
+      "can_search": false,
+      "has_mtl": false,
+      "request_rate_limit": 0.1,
+      "total_commits": 1,
+      "contributors": [],
+      "id": "c812b1f6e807da9a7d4c481e4c0ac68c",
+      "base_urls": [
+        "https://www.qidian.com/",
+        "https://book.qidian.com/"
+      ],
+      "github_url": "https://github.com/lncrawl/lightnovel-crawler/blob/dev/sources/zh/qidian.py"
     },
     "c88801bc55f58e5d2c88474fe124ce6c": {
       "version": 1785622925,

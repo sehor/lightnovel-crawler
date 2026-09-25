@@ -1,10 +1,11 @@
-"""Qidian signed-new-book ranking discovery and snapshot logic."""
+"""Qidian ranking discovery and snapshot logic."""
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 import re
 from typing import Iterable, Optional, Tuple
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup, Tag
 from scraper import Scraper
@@ -16,6 +17,75 @@ QIDIAN_RANKING_URL = "https://www.qidian.com/rank/signNewBkAll/"
 QIDIAN_BOOK_HOST = "www.qidian.com"
 QIDIAN_PAGE_SIZE = 20
 _BOOK_PATH = re.compile(r"^/book/(\d+)/?$", re.IGNORECASE)
+_RANKING_PATH = re.compile(r"^/rank/([a-z0-9_-]+)(?:/page\d+)?/?$", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class RankingDefinition:
+    """A selectable Qidian ranking page."""
+
+    ranking_id: str
+    name: str
+    url: str
+
+
+QIDIAN_RANKINGS = (
+    RankingDefinition(
+        ranking_id=QIDIAN_RANKING_ID,
+        name="起点-新书签约榜",
+        url=QIDIAN_RANKING_URL,
+    ),
+    RankingDefinition(
+        ranking_id="retention",
+        name="起点-留存榜",
+        url="https://www.qidian.com/rank/retention/",
+    ),
+)
+
+
+def resolve_rankings(selections: Iterable[str] = ()) -> Tuple[RankingDefinition, ...]:
+    """Resolve preset IDs or explicit Qidian ranking URLs, defaulting to presets."""
+    requested = tuple(selection.strip() for selection in selections if selection.strip())
+    if not requested:
+        return QIDIAN_RANKINGS
+
+    presets = {ranking.ranking_id: ranking for ranking in QIDIAN_RANKINGS}
+    presets_by_path = {
+        urlsplit(ranking.url).path.rstrip("/").lower(): ranking for ranking in QIDIAN_RANKINGS
+    }
+    resolved = []
+    seen_urls = set()
+    for selection in requested:
+        ranking = presets.get(selection)
+        if ranking is None:
+            parts = urlsplit(selection)
+            match = _RANKING_PATH.fullmatch(parts.path)
+            if (
+                parts.scheme not in ("http", "https")
+                or parts.hostname != QIDIAN_BOOK_HOST
+                or match is None
+            ):
+                raise ValueError(
+                    f"Expected a preset ranking ID or a Qidian /rank/ URL: {selection}"
+                )
+            base_path = re.sub(r"/page\d+/?$", "/", parts.path, flags=re.IGNORECASE)
+            base_path = f"{base_path.rstrip('/')}/"
+            url = urlunsplit(("https", QIDIAN_BOOK_HOST, base_path, parts.query, ""))
+            ranking = presets_by_path.get(base_path.rstrip("/").lower())
+            if ranking is None:
+                query_suffix = (
+                    f"-{hashlib.sha1(parts.query.encode()).hexdigest()[:8]}" if parts.query else ""
+                )
+                ranking = RankingDefinition(
+                    ranking_id=f"qidian-{match.group(1).lower()}{query_suffix}",
+                    name=f"起点-{match.group(1)}",
+                    url=url,
+                )
+        if ranking.url in seen_urls:
+            continue
+        resolved.append(ranking)
+        seen_urls.add(ranking.url)
+    return tuple(resolved)
 
 
 class RankingParseError(ValueError):
@@ -41,20 +111,28 @@ class RankingSnapshot:
 
 
 class QidianRankingProvider:
-    """Read and parse Qidian's signed-new-book ranking."""
+    """Read and parse a Qidian ranking."""
 
     platform = "qidian"
-    ranking_id = QIDIAN_RANKING_ID
-    ranking_url = QIDIAN_RANKING_URL
     page_size = QIDIAN_PAGE_SIZE
 
-    @staticmethod
-    def page_url(page_number: int) -> str:
+    def __init__(
+        self,
+        ranking_id: str = QIDIAN_RANKING_ID,
+        ranking_url: Optional[str] = None,
+    ) -> None:
+        definition = resolve_rankings((ranking_id if ranking_url is None else ranking_url,))[0]
+        self.ranking_id = definition.ranking_id
+        self.ranking_url = definition.url
+
+    def page_url(self, page_number: int) -> str:
         if page_number < 1:
             raise ValueError("page_number must be at least 1")
+        parts = urlsplit(self.ranking_url)
         if page_number == 1:
-            return QIDIAN_RANKING_URL
-        return f"{QIDIAN_RANKING_URL}page{page_number}/"
+            return self.ranking_url
+        path = f"{parts.path.rstrip('/')}/page{page_number}/"
+        return urlunsplit((parts.scheme, parts.netloc, path, parts.query, ""))
 
     def fetch_page(self, page_number: int, scraper: Scraper) -> RankingPage:
         """Render a ranking page and verify its visible pagination boundary."""
@@ -77,10 +155,11 @@ class QidianRankingProvider:
                 raise RankingAccessError("Qidian ranking access was refused")
         else:
             raise RankingParseError("Ranking entries are absent after rendering twice")
-        next_path = urlsplit(self.page_url(page_number + 1)).path
+        next_url = self.page_url(page_number + 1)
+        next_path = urlsplit(next_url).path
         has_next = any(
             urlsplit(urljoin(url, str(anchor.get("href") or ""))).path == next_path
-            for anchor in soup.select('a[href*="signNewBkAll/page"]')
+            for anchor in soup.select('a[href*="/rank/"]')
         )
         result = self.parse_page(html, page_number=page_number, has_next=has_next)
         if has_next and len(result.candidates) != self.page_size:
@@ -232,18 +311,16 @@ class QidianRankingProvider:
                     return value
         return ""
 
-    @staticmethod
-    def _book_id_from_url(href: str) -> Optional[str]:
-        url = urljoin(QIDIAN_RANKING_URL, href)
+    def _book_id_from_url(self, href: str) -> Optional[str]:
+        url = urljoin(self.ranking_url, href)
         parts = urlsplit(url)
         if parts.scheme not in ("http", "https") or parts.hostname != QIDIAN_BOOK_HOST:
             return None
         match = _BOOK_PATH.fullmatch(parts.path)
         return match.group(1) if match else None
 
-    @staticmethod
-    def _canonical_book_url(href: str) -> str:
-        url = urljoin(QIDIAN_RANKING_URL, href)
+    def _canonical_book_url(self, href: str) -> str:
+        url = urljoin(self.ranking_url, href)
         parts = urlsplit(url)
         match = _BOOK_PATH.fullmatch(parts.path)
         if parts.hostname != QIDIAN_BOOK_HOST or match is None:

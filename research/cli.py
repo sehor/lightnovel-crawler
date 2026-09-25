@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from typing import Literal
+from typing import List, Literal, Optional
 
 import typer
 
@@ -16,6 +16,7 @@ class CollectOptions:
     chapters: int = 5
     max_candidates: int = 50
     db: Path = DEFAULT_DB_PATH
+    rankings: tuple[str, ...] = ()
 
     def validate(self) -> None:
         if self.target_books < 1:
@@ -41,42 +42,99 @@ def _run_exit_code(status: str) -> int:
 
 @app.command()
 def collect(
-    target_books: int = typer.Option(10, min=1, help="合格书目标数。"),
+    target_books: int = typer.Option(10, min=1, help="每个榜单的合格书目标数。"),
     chapters: int = typer.Option(5, min=1, help="每本连续检查的开篇章节数。"),
-    max_candidates: int = typer.Option(50, min=1, help="最多检查的榜单候选数。"),
+    max_candidates: int = typer.Option(50, min=1, help="每个榜单最多检查的候选数。"),
+    ranking: Optional[List[str]] = typer.Option(
+        None,
+        "--ranking",
+        "-r",
+        help="榜单 ID 或起点榜单 URL；可重复指定。省略时运行所有预设榜单。",
+    ),
     db: Path = typer.Option(DEFAULT_DB_PATH, help="独立研究 SQLite 文件。"),
 ) -> None:
-    """Discover and collect eligible books from the supported ranking."""
-    options = CollectOptions(target_books, chapters, max_candidates, db)
-    try:
-        options.validate()
-    except ValueError as error:
-        raise typer.BadParameter(str(error)) from error
+    """Collect eligible books from preset or user-selected Qidian rankings."""
     from lncrawl.context import ctx
     from research.collector import Collector, QidianBookReader
-    from research.ranking.qidian import QidianRankingProvider, RankingAccessError
+    from research.ranking.qidian import (
+        QidianRankingProvider,
+        RankingAccessError,
+        resolve_rankings,
+    )
 
+    options = CollectOptions(target_books, chapters, max_candidates, db, tuple(ranking or ()))
     try:
-        scraper = ctx.scraper.open("https://www.qidian.com/", rate_limit=0.1)
-        try:
-            with ctx.scraper.render_batch():
-                snapshot = QidianRankingProvider().discover(options.max_candidates, scraper)
-        finally:
-            scraper.close()
-        result = Collector(ResearchDB(options.db), QidianBookReader()).start(
-            snapshot,
-            target_books=options.target_books,
-            chapter_count=options.chapters,
-            max_candidates=options.max_candidates,
-        )
-    except RankingAccessError as error:
-        typer.echo(f"collect blocked: {error}", err=True)
-        raise typer.Exit(code=3) from error
+        options.validate()
+        selected_rankings = resolve_rankings(options.rankings)
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+
+    results = []
+    errors = []
+    blocked = False
+    try:
+        collector = Collector(ResearchDB(options.db), QidianBookReader())
+        for definition in selected_rankings:
+            try:
+                scraper = ctx.scraper.open("https://www.qidian.com/", rate_limit=0.1)
+                try:
+                    provider = QidianRankingProvider(
+                        ranking_id=definition.ranking_id,
+                        ranking_url=definition.url,
+                    )
+                    with ctx.scraper.render_batch():
+                        snapshot = provider.discover(options.max_candidates, scraper)
+                finally:
+                    scraper.close()
+                result = collector.start(
+                    snapshot,
+                    target_books=options.target_books,
+                    chapter_count=options.chapters,
+                    max_candidates=options.max_candidates,
+                )
+                result["ranking_name"] = definition.name
+                result["ranking_url"] = definition.url
+                results.append(result)
+            except RankingAccessError as error:
+                blocked = True
+                errors.append(
+                    {
+                        "ranking_id": definition.ranking_id,
+                        "ranking_url": definition.url,
+                        "status": "blocked_access",
+                        "error": str(error),
+                    }
+                )
+                break
+            except Exception as error:
+                errors.append(
+                    {
+                        "ranking_id": definition.ranking_id,
+                        "ranking_url": definition.url,
+                        "status": "failed",
+                        "error": f"{type(error).__name__}: {error}",
+                    }
+                )
     except Exception as error:
         typer.echo(f"collect failed: {type(error).__name__}: {error}", err=True)
         raise typer.Exit(code=1) from error
-    typer.echo(json.dumps(result, ensure_ascii=False))
-    raise typer.Exit(code=_run_exit_code(result["status"]))
+
+    typer.echo(json.dumps({"runs": results, "errors": errors}, ensure_ascii=False))
+    if blocked:
+        raise typer.Exit(code=3)
+    if errors:
+        raise typer.Exit(code=1)
+    if any(result["status"] != "completed" for result in results):
+        raise typer.Exit(code=2)
+
+
+@app.command()
+def rankings() -> None:
+    """List the built-in Qidian ranking presets."""
+    from research.ranking.qidian import QIDIAN_RANKINGS
+
+    for ranking in QIDIAN_RANKINGS:
+        typer.echo(f"{ranking.ranking_id}\t{ranking.name}\t{ranking.url}")
 
 
 @app.command()

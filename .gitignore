@@ -36,3 +36,7 @@ windows/
 config.json
 .claude/settings.local.json
 /rthooks
+/data/research.db
+/data/research.db-*
+/data/research-exports/
+/data/research-cache/

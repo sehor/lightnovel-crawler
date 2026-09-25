@@ -2,14 +2,14 @@
 
 ## 输入与前置条件
 
-读取产品说明书、[开发契约](contracts.md)、阶段 2 候选接口和阶段 3 起点 Source。阶段 0 正文关口须为 `GO`，阶段 1—3 的出口须通过。此阶段负责把候选变成完整的研究记录。
+读取产品说明书、[开发契约](contracts.md)、阶段 2 候选接口和阶段 3 起点 Source。阶段 1—3 的出口须通过。此阶段负责把候选变成完整的研究记录。
 
 ## 具体任务
 
 1. **04.1 候选与入选**：`collect` 先冻结最多 `max_candidates` 个候选，然后依原始名次处理，直到取得 `target_books` 本合格书或候选耗尽。每本检查目录前 `chapters` 章；不足、非公开免费或正文无效时整本跳过，并在 `run_candidates` 写原因。入选书在 `ranking_entries` 保留原始名次。
 2. **04.2 原子保存与去重**：一书五章及其名次在单一事务中提交。按平台书籍 ID、章节 ID/规范化 URL 的唯一键复用已有数据；`content_hash` 用于校验正文，不用于跨书合并。重复运行可创建新的榜单运行记录，但不会生成重复书籍/章节或重新下载已完成章节。
 3. **04.3 断点续跑**：每处理完一个候选就保存其状态。`resume --run-id` 使用同一运行冻结的候选序列，跳过已成功或已确定不合格的候选；可重试此前 `fetch_error` 的候选一次。事务中断后不能留下部分章节。恢复时不重新抓取榜单并混用新名次。
-4. **04.4 状态与错误隔离**：单书可恢复错误计入失败数并继续下一本；平台明确拒绝访问即停止整次运行并标记 `blocked_access`。达到目标为 `completed`；候选耗尽未达目标为 `partial`。`status` 显示扫描、入选、跳过、失败数量和原因分类，不输出章节正文。
+4. **04.4 状态与错误隔离**：单书可恢复错误计入失败数并继续下一本；平台明确拒绝访问即停止整次运行并标记 `blocked_access`；目录或正文渲染超时也保守停止并记为 `unknown_access`，避免验证码页后继续请求。达到目标为 `completed`；候选耗尽未达目标为 `partial`。`status` 显示扫描、入选、跳过、失败数量和原因分类，不输出章节正文。
 
 ## 交付物
 
@@ -17,8 +17,8 @@
 
 ## 验收命令
 
-运行 `uv run python -m unittest discover -s tests/research`、`uv run ruff check research tests/research`、`uv run ruff format --check research tests/research`。离线测试至少模拟：前五章中一章收费、第五章缺失、正文错误页、单书网络失败、事务写入中断、续跑和重复运行。真实有限采集只按阶段 0 的允许方式进行，并核对 `status` 统计与 SQLite 行数。
+运行 `uv run python -m unittest discover -s tests/research`、`uv run ruff check research tests/research`、`uv run ruff format --check research tests/research`。离线测试至少模拟：前五章中一章收费、第五章缺失、正文错误页、单书网络失败、事务写入中断、续跑和重复运行。真实有限采集核对 `status` 统计与 SQLite 行数。
 
 ## 失败时处理
 
-重复、半本数据或名次重排属于阻断缺陷，修复后重新验证阶段出口。扫描上限内不足十本是 `partial`，不扩大扫描上限或更换平台来隐瞒结果；是否调整上限应通过新 Issue 和记录决定。访问拒绝保持 `blocked_access`，回到阶段 0 关口。
+重复、半本数据或名次重排属于阻断缺陷，修复后重新验证阶段出口。扫描上限内不足十本是 `partial`，不扩大扫描上限或更换平台来隐瞒结果；是否调整上限应通过新 Issue 和记录决定。访问拒绝保持 `blocked_access` 并记录平台响应。

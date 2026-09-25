@@ -128,6 +128,11 @@ class Sources:
             logger.info("Source synced.")
         except AbortedException:
             pass
+        except Exception as exc:
+            logger.warning(
+                f"Failed to sync online sources; using the loaded index: {exc}",
+                exc_info=ctx.logger.is_info,
+            )
 
     def load_index(self, index: CrawlerIndex) -> None:
         try:

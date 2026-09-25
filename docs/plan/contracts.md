@@ -13,15 +13,15 @@ export --run-id RUN_ID --format jsonl|parquet --output DIR [--db data/research.d
 status --run-id RUN_ID [--db data/research.db]
 ```
 
-MVP 只支持 `qidian` / `newcomer-signed` 这一组平台与榜单；CLI 暂不开放任意平台或分类参数。`target-books` 是合格书目标，`max-candidates` 是最多检查的原始榜单候选数，必须不小于目标数。`chapters` 表示从目录开头起连续检查并完整保存的章节数，默认 5。验收使用默认值；改变参数不改变数据模型。运行结束输出 `run_id`、扫描数、入选数、跳过数、失败数及最终状态。
+MVP 只支持 `qidian` / `sign-new-book` 这一组平台与榜单；CLI 暂不开放任意平台或分类参数。`target-books` 是合格书目标，`max-candidates` 是最多检查的原始榜单候选数，必须不小于目标数。`chapters` 表示从目录开头起连续检查并完整保存的章节数，默认 5。验收使用默认值；改变参数不改变数据模型。运行结束输出 `run_id`、扫描数、入选数、跳过数、失败数及最终状态。
 
-退出码：`0` 为目标达成，`2` 为扫描上限内未达目标，`3` 为访问方式受限或权限关口未通过，`1` 为其他运行错误。`status` 和 `export` 的成功退出码为 `0`；找不到 `run_id` 或格式错误为 `1`。
+退出码：`0` 为目标达成，`2` 为扫描上限内未达目标，`3` 为站点明确拒绝或要求不可用的访问条件，`1` 为其他运行错误。`status` 和 `export` 的成功退出码为 `0`；找不到 `run_id` 或格式错误为 `1`。
 
 ## 采集接口
 
-`RankingProvider` 只产出榜单候选，不抓正文。每个 `BookCandidate` 至少含 `platform`、`ranking_id`、`external_book_id`、`book_url`、`title`、`author`、可空 `category`、`original_rank`。同一次发现先冻结候选顺序及 `snapshot_at`，再逐书处理。`original_rank` 取起点榜单实际名次，不能因筛选而重排。
+`RankingProvider` 只产出榜单候选，不抓正文。每个 `BookCandidate` 至少含 `platform`、`ranking_id`、`external_book_id`、`book_url`、`title`、`author`、可空 `category`、`original_rank`。同一次发现先冻结候选顺序及 `snapshot_at`，再逐书处理。`original_rank` 取起点榜单展示名次 `.rank-tag`，不能因筛选而重排。`data-rid` 在第二页重置为 1，不可用它推算跨页名次。
 
-起点 Source 负责书籍详情、目录顺序、公开免费状态和正文解析。Research 层按目录前 `N` 章逐章判定：任何一章不足、非公开免费或正文无效，整本不入选；只采集和保存完全合格的书。无法判断免费状态时按不合格处理。授权或访问方式不明确时停止正文流程，不尝试登录、付费、验证码处理或访问控制规避。
+起点 Source 负责书籍详情、目录顺序、公开免费状态和正文解析。Research 层按目录前 `N` 章逐章判定：任何一章不足、非公开免费或正文无效，整本不入选；只采集和保存完全合格的书。无法判断免费状态时按不合格处理。站点明确要求登录、付费、验证码或拒绝访问时停止该样本并记录原因；不尝试绕过访问控制。
 
 正文有效的最低判定：去除页面结构后有非空实质文本，且不是登录/付费/错误提示或明显截断。具体可复现的站点判定样例放在阶段 3 离线 fixture 中，不在通用层硬编码平台文案。
 

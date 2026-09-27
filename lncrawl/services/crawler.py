@@ -127,9 +127,27 @@ class CrawlerService:
             novel.mtl = model.is_mtl or crawler.has_mtl
             novel.synopsis = model.synopsis
             novel.tags = model.tags or []
+            novel.ranking_names = model.ranking_names or []
             novel.rtl = model.is_rtl or False
             novel.volume_count = len(model.volumes)
             novel.chapter_count = len(model.chapters)
+
+            # Source statistics are optional and may be absent on later refreshes.
+            for field in (
+                "source_id",
+                "word_count",
+                "total_recommendations",
+                "weekly_recommendations",
+                "weekly_tipper_count",
+                "source_chapter_count",
+                "author_work_count",
+                "author_level",
+                "author_total_word_count",
+                "author_creation_days",
+            ):
+                value = getattr(model, field)
+                if value is not None:
+                    setattr(novel, field, value)
 
             # detect novel language
             sample = f"{model.title}\n{model.synopsis or ''}".strip()

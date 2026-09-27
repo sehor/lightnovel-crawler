@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from importlib import util
 import logging
 import threading
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional
 
 from scraper import BROWSER_MODES, extract_base, pick_chromium, pick_firefox
 
@@ -136,9 +137,9 @@ class ScraperService:
         if wanted in ("auto", "firefox"):
             firefox = pick_firefox()
             if firefox:
-                from scraper import BidiSolver
+                from .browser_batch import BatchBidiSolver
 
-                return BidiSolver(executable=firefox, mode=mode)
+                return BatchBidiSolver(executable=firefox, mode=mode)
             if wanted == "firefox":
                 logger.info("No Firefox executable found; challenges will not be solved")
                 return None
@@ -261,6 +262,18 @@ class ScraperService:
     # ------------------------------------------------------------------------- #
     # Sessions
     # ------------------------------------------------------------------------- #
+
+    @contextmanager
+    def render_batch(self) -> Iterator[None]:
+        """Reuse one Firefox tab for an explicit multi-page operation."""
+        from .browser_batch import BatchBidiSolver
+
+        solver = self.solver
+        if isinstance(solver, BatchBidiSolver):
+            with solver.batch():
+                yield
+        else:
+            yield
 
     def open(
         self,

@@ -86,6 +86,10 @@ lsp = [
   "python-lsp-server[websockets]>=1.14.0",
   "ruff>=0.9.0",
 ]
+research = [
+    "pyarrow>=18,<19 ; python_full_version < '3.10'",
+    "pyarrow>=25,<26 ; python_full_version >= '3.10'",
+]
 
 [dependency-groups]
 dev = [
@@ -129,7 +133,7 @@ version = {file = "lncrawl/VERSION"}
 
 [tool.setuptools.packages.find]
 exclude = ["tests*", "docs*", "build*", "dist*"]
-include = ["lncrawl*", "sources*"]
+include = ["lncrawl*", "sources*", "research*"]
 where = ["."]
 
 [tool.setuptools.package-data]

@@ -21,6 +21,56 @@ class Novel(BaseTable, table=True):
     tags: List[str] = sa.Field(
         default=[], sa_type=sa.JSON, description="List of genre or thematic tags"
     )
+    ranking_names: List[str] = sa.Field(
+        default=[],
+        sa_type=sa.JSON,
+        sa_column_kwargs={"server_default": "[]"},
+        description="Names of rankings the novel appears in",
+    )
+    source_id: Optional[str] = sa.Field(
+        default=None, description="Novel ID assigned by the source website"
+    )
+    word_count: Optional[int] = sa.Field(
+        default=None, sa_type=sa.BigInteger, description="Source-reported novel word count"
+    )
+    total_recommendations: Optional[int] = sa.Field(
+        default=None,
+        sa_type=sa.BigInteger,
+        description="Source-reported all-time recommendations",
+    )
+    weekly_recommendations: Optional[int] = sa.Field(
+        default=None,
+        sa_type=sa.BigInteger,
+        description="Source-reported weekly recommendations",
+    )
+    weekly_tipper_count: Optional[int] = sa.Field(
+        default=None,
+        sa_type=sa.BigInteger,
+        description="Number of readers tipping this week",
+    )
+    source_chapter_count: Optional[int] = sa.Field(
+        default=None,
+        sa_type=sa.BigInteger,
+        description="Total serialized chapters reported by the source",
+    )
+    author_work_count: Optional[int] = sa.Field(
+        default=None,
+        sa_type=sa.BigInteger,
+        description="Source-reported number of works by the author",
+    )
+    author_level: Optional[str] = sa.Field(
+        default=None, description="Author rank or level reported by the source"
+    )
+    author_total_word_count: Optional[int] = sa.Field(
+        default=None,
+        sa_type=sa.BigInteger,
+        description="Source-reported cumulative author word count",
+    )
+    author_creation_days: Optional[int] = sa.Field(
+        default=None,
+        sa_type=sa.BigInteger,
+        description="Author's reported number of creation days",
+    )
     cover_url: Optional[str] = sa.Field(
         default=None,
         description="Cover image URL",
